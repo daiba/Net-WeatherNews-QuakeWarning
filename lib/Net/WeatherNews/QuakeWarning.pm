@@ -52,6 +52,10 @@ sub connect_stream {
             on_eof => sub {
                 $handle->destroy;
             },
+            on_error => sub {
+                $handle->destroy;
+                $self->connect_stream($ip, $port);
+            },
         );
 
         my $req = HTTP::Headers->new(
@@ -81,7 +85,6 @@ sub connect_stream {
 
             my $reader; $reader = sub {
                 my($handle, $line) = @_;
-                warn $line;
 
                 my $req = HTTP::Request->parse($line);
                 if ($req->header('X-WNI-ID') eq 'Data') {
@@ -89,8 +92,7 @@ sub connect_stream {
                         or return $self->on_error->("Content-Length not found: $line");
                     $handle->unshift_read(chunk => $length, sub {
                         my $data = $_[1];
-                        warn $data;
-                        # parse EEW
+                        $self->on_warning->($data);
                     });
                 } elsif ($req->header('X-WNI-ID') eq 'Keep-Alive') {
                     # do nothing
